@@ -16,6 +16,10 @@ jobs:
     permissions:
       contents: read #This is required for actions/checkout
 
+    env:
+      MODEL_TYPE: classical
+      DEBUG: False
+
     steps:
       - uses: actions/checkout@v4
 
@@ -30,9 +34,27 @@ jobs:
           source venv/bin/activate
       
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          # Renommer requirements_classical.txt en requirements.txt si nécessaire
+          # (ou modifier la ligne ci-dessous pour utiliser directement requirements_classical.txt)
+          cp requirements_classical.txt requirements.txt
+          pip install -r requirements.txt
+          # Installer les dépendances de test
+          pip install pytestpip install -r requirements.txt
         
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
+      # Ajoutez cette étape pour s'assurer que gunicorn est installé
+      - name: Install Gunicorn
+        run: |
+          source venv/bin/activate
+          pip install gunicorn
+
+      # Ajout d'un fichier de configuration pour Azure
+      - name: Create startup files
+        run: |
+          echo "gunicorn --bind=0.0.0.0 --timeout 600 api:app" > startup.sh
+          chmod +x startup.sh
+
 
       - name: Zip artifact for deployment
         run: zip release.zip ./* -r
