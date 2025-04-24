@@ -98,4 +98,5 @@ jobs:
           slot-name: 'Production'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_83E000E4AE6B44498C68E4F21F1D421C }}
           package: '.'
-          deployment-method: runFromPackage
+          # Remplacer par d'autres paramètres reconnus si nécessaire
+          clean: true  # Nettoie les fichiers existants avant le déploiement
