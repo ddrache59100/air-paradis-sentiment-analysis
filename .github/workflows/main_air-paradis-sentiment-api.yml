@@ -52,7 +52,9 @@ jobs:
       # Ajout d'un fichier de configuration pour Azure
       - name: Create startup files
         run: |
-          echo "gunicorn --bind=0.0.0.0 --timeout 600 api:app" > startup.sh
+          echo "#!/bin/bash" > startup.sh
+          echo "cd /home/site/wwwroot" >> startup.sh
+          echo "gunicorn --bind=0.0.0.0 --timeout 600 api:app" >> startup.sh
           chmod +x startup.sh
 
 
