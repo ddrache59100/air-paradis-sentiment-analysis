@@ -40,7 +40,7 @@ jobs:
           cp requirements_classical.txt requirements.txt
           pip install -r requirements.txt
           # Installer les dépendances de test
-          pip install pytestpip install -r requirements.txt
+          pip install pytest
         
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
       # Ajoutez cette étape pour s'assurer que gunicorn est installé
