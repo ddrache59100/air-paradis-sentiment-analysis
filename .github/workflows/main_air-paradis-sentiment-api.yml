@@ -58,15 +58,15 @@ jobs:
           chmod +x startup.sh
 
 
-      - name: Zip artifact for deployment
-        run: zip release.zip ./* -r
+      #- name: Zip artifact for deployment
+      #  run: zip release.zip ./* -r
 
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v4
         with:
           name: python-app
           path: |
-            release.zip
+            ./*
             !venv/
 
   deploy:
@@ -93,3 +93,4 @@ jobs:
           app-name: 'air-paradis-sentiment-api'
           slot-name: 'Production'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_83E000E4AE6B44498C68E4F21F1D421C }}
+          package: '.' 
