@@ -36,13 +36,11 @@ jobs:
       - name: Install dependencies
         run: |
           # Renommer requirements_classical.txt en requirements.txt si nécessaire
-          # (ou modifier la ligne ci-dessous pour utiliser directement requirements_classical.txt)
           cp requirements_classical.txt requirements.txt
           pip install -r requirements.txt
           # Installer les dépendances de test
           pip install pytest
         
-      # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
       # Ajoutez cette étape pour s'assurer que gunicorn est installé
       - name: Install Gunicorn
         run: |
@@ -56,18 +54,24 @@ jobs:
           echo "cd /home/site/wwwroot" >> startup.sh
           echo "gunicorn --bind=0.0.0.0 --timeout 600 api:app" >> startup.sh
           chmod +x startup.sh
+          
+      # Création d'un fichier wsgi.py pour simplifier le démarrage
+      - name: Create WSGI file
+        run: |
+          echo "from api import app" > wsgi.py
+          echo "" >> wsgi.py
+          echo "if __name__ == \"__main__\":" >> wsgi.py
+          echo "    app.run()" >> wsgi.py
 
-
-      #- name: Zip artifact for deployment
-      #  run: zip release.zip ./* -r
+      # Création du zip pour le déploiement
+      - name: Zip artifact for deployment
+        run: zip -r release.zip ./* -x "venv/*"
 
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v4
         with:
           name: python-app
-          path: |
-            ./*
-            !venv/
+          path: release.zip
 
   deploy:
     runs-on: ubuntu-latest
@@ -82,9 +86,9 @@ jobs:
         with:
           name: python-app
 
+      # Cette étape est maintenant correcte car nous avons recréé le zip
       - name: Unzip artifact for deployment
         run: unzip release.zip
-
       
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
@@ -93,4 +97,4 @@ jobs:
           app-name: 'air-paradis-sentiment-api'
           slot-name: 'Production'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_83E000E4AE6B44498C68E4F21F1D421C }}
-          package: '.' 
+          package: '.'
