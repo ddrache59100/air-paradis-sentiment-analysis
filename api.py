@@ -1,4 +1,4 @@
-# api.py avec gestion amelioree des modeles
+# api.py avec lazy loading du modèle
 
 import os
 import re
@@ -7,29 +7,10 @@ import pickle
 import numpy as np
 from flask import Flask, request, jsonify
 
-model = None
-tokenizer = None
-model_type = None
-current_config = None
-
 # Importations conditionnelles selon le type de modele
 try:
     import tensorflow as tf
     tf_available = True
-
-    gpus = tf.config.list_physical_devices('GPU')
-    if gpus:
-        try:
-            # Ne configure que pour le premier GPU visible si necessaire
-            # Ou configure pour tous les GPUs detectes
-            for gpu in gpus:
-                tf.config.experimental.set_memory_growth(gpu, True)
-            print(f"Croissance memoire activee pour les GPUs: {gpus}")
-        except RuntimeError as e:
-            # La croissance memoire doit etre activee avant l'initialisation des GPUs
-            print(f"Erreur lors de l'activation de la croissance memoire: {e}")
-
-
 except ImportError:
     tf_available = False
 
@@ -51,6 +32,24 @@ app.config.from_mapping(
 # --- Configuration ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CONFIG_PATH = os.path.join(BASE_DIR, 'model_config.json')
+
+# Variables globales pour le modèle et ses ressources
+_model = None
+_tokenizer = None
+_model_type = None
+_current_config = None
+_model_initialized = False
+
+def get_model():
+    """Fonction pour obtenir le modèle, en le chargeant si nécessaire"""
+    global _model, _tokenizer, _model_type, _current_config, _model_initialized
+    if not _model_initialized:
+        try:
+            _model, _tokenizer, _model_type, _current_config = load_model_and_resources()
+            _model_initialized = True
+        except Exception as e:
+            print(f"Erreur lors du chargement du modèle: {e}")
+    return _model, _tokenizer, _model_type, _current_config
 
 def load_model_config():
     """
@@ -131,8 +130,6 @@ def load_model_and_resources():
     
     model = None
     tokenizer = None
-    model_type = None
-    current_config = None
     
     try:
         print(f"Chargement du modele {best_model_type} depuis: {best_model_path}")
@@ -201,9 +198,6 @@ def load_model_and_resources():
         
         # Au lieu de quitter l'application, lever l'exception pour qu'elle puisse etre geree
         raise
-
-# --- Variable globale pour stocker la configuration utilisee ---
-current_config = None
 
 # --- Fonction de prediction selon le type de modele ---
 def predict_with_model(text, model_type, model, tokenizer=None):
@@ -292,8 +286,13 @@ def change_config():
         return jsonify({"error": f"Le fichier de configuration '{config_path}' n'existe pas"}), 404
     
     try:
-        # Recharger le modele avec la nouvelle configuration
-        _, _, model_type, config = reload_model_with_config(config_path)
+        # Mettre à jour le chemin de configuration
+        app.config['CUSTOM_CONFIG_PATH'] = config_path
+        
+        # Forcer le rechargement du modèle
+        global _model_initialized
+        _model_initialized = False
+        model, tokenizer, model_type, config = get_model()
         
         return jsonify({
             "success": True,
@@ -310,14 +309,16 @@ def change_config():
 # --- Endpoint pour verifier la configuration actuelle ---
 @app.route('/config', methods=['GET'])
 def get_current_config():
+    model, tokenizer, model_type, current_config = get_model()
+    
     return jsonify({
         "config_path": app.config.get('CUSTOM_CONFIG_PATH') or DEFAULT_CONFIG_PATH,
         "is_custom": app.config.get('CUSTOM_CONFIG_PATH') is not None,
         "config": current_config,
         "model_info": {
-            "has_predict": hasattr(model, 'predict') and callable(getattr(model, 'predict')),
-            "has_predict_proba": hasattr(model, 'predict_proba') and callable(getattr(model, 'predict_proba')),
-            "type": str(type(model).__name__)
+            "has_predict": hasattr(model, 'predict') and callable(getattr(model, 'predict')) if model else False,
+            "has_predict_proba": hasattr(model, 'predict_proba') and callable(getattr(model, 'predict_proba')) if model else False,
+            "type": str(type(model).__name__) if model else None
         }
     })
 
@@ -334,7 +335,10 @@ def predict_sentiment():
         return jsonify({"error": "Le champ 'text' est manquant, vide ou n'est pas une chaine de caracteres"}), 400
 
     try:
-        # Verifier si le modele est charge
+        # Charger le modèle si nécessaire
+        model, tokenizer, model_type, current_config = get_model()
+            
+        # Vérifier si le modèle est chargé
         if model is None:
             return jsonify({
                 "error": "Aucun modele n'est charge. Impossible de faire une prediction.",
@@ -366,7 +370,8 @@ def predict_sentiment():
 # --- Endpoint de statut ---
 @app.route('/status', methods=['GET'])
 def status():
-    global model, model_type, current_config  # Référencez explicitement les variables globales
+    # Charger le modèle si nécessaire
+    model, tokenizer, model_type, current_config = get_model()
     
     return jsonify({
         "status": "API operationnelle",
@@ -389,6 +394,9 @@ def welcome():
     """
     Page d'accueil simple pour l'API.
     """
+    # Charger le modèle si nécessaire
+    model, tokenizer, model_type, current_config = get_model()
+    
     return jsonify({
         "name": "Air Paradis - API d'analyse de sentiment",
         "description": "Cette API permet d'analyser le sentiment de tweets pour anticiper les bad buzz.",
@@ -426,169 +434,3 @@ def welcome():
             "is_custom": app.config.get('CUSTOM_CONFIG_PATH') is not None
         }
     })
-
-# --- Lancement du serveur ---
-
-if __name__ == '__main__':
-    # Vérifier si un paramètre de configuration personnalisé est fourni en ligne de commande
-    import sys
-    
-    # Initialiser les variables globales
-    model = None
-    tokenizer = None
-    model_type = None
-    current_config = None
-    
-    try:
-        # Déterminer quelle configuration utiliser
-        if len(sys.argv) > 1:
-            custom_config_path = sys.argv[1]
-            if os.path.exists(custom_config_path):
-                print(f"Utilisation de la configuration personnalisée via ligne de commande: {custom_config_path}")
-                app.config['CUSTOM_CONFIG_PATH'] = custom_config_path
-                
-                # Charger la configuration
-                try:
-                    with open(custom_config_path, 'r') as f:
-                        config = json.load(f)
-                    
-                    # Résoudre les chemins relatifs
-                    if config.get("best_model") and not os.path.isabs(config.get("best_model")):
-                        config["best_model"] = os.path.join(BASE_DIR, config["best_model"])
-                    
-                    if config.get("tokenizer") and config.get("tokenizer") is not None and not os.path.isabs(config.get("tokenizer")):
-                        config["tokenizer"] = os.path.join(BASE_DIR, config["tokenizer"])
-                    
-                    current_config = config
-                except Exception as e:
-                    print(f"Erreur lors du chargement de la configuration personnalisée: {e}")
-                    print("Fallback sur la configuration par défaut...")
-                    current_config = {
-                        "best_model": os.path.join(BASE_DIR, 'models', 'classical', 'regression_logistique.pkl'),
-                        "best_model_type": "classical",
-                        "tokenizer": None
-                    }
-            else:
-                print(f"AVERTISSEMENT: Le fichier de configuration '{custom_config_path}' spécifié en ligne de commande n'existe pas.")
-                print("Utilisation de la configuration par défaut.")
-                current_config = {
-                    "best_model": os.path.join(BASE_DIR, 'models', 'classical', 'regression_logistique.pkl'),
-                    "best_model_type": "classical",
-                    "tokenizer": None
-                }
-        else:
-            # Pas de configuration personnalisée, utiliser la configuration par défaut
-            try:
-                with open(DEFAULT_CONFIG_PATH, 'r') as f:
-                    config = json.load(f)
-                
-                # Résoudre les chemins relatifs
-                if config.get("best_model") and not os.path.isabs(config.get("best_model")):
-                    config["best_model"] = os.path.join(BASE_DIR, config["best_model"])
-                
-                if config.get("tokenizer") and config.get("tokenizer") is not None and not os.path.isabs(config.get("tokenizer")):
-                    config["tokenizer"] = os.path.join(BASE_DIR, config["tokenizer"])
-                
-                current_config = config
-                print(f"Utilisation de la configuration par défaut: {DEFAULT_CONFIG_PATH}")
-            except Exception as e:
-                print(f"Erreur lors du chargement de la configuration par défaut: {e}")
-                current_config = {
-                    "best_model": os.path.join(BASE_DIR, 'models', 'classical', 'regression_logistique.pkl'),
-                    "best_model_type": "classical",
-                    "tokenizer": None
-                }
-        
-        # Charger le modèle avec la configuration déterminée
-        best_model_path = current_config.get("best_model")
-        best_model_type = current_config.get("best_model_type", "classical")
-        tokenizer_path = current_config.get("tokenizer")
-        
-        print(f"Chargement du modèle {best_model_type} depuis: {best_model_path}")
-        
-        if best_model_type == 'classical':
-            with open(best_model_path, 'rb') as f:
-                model = pickle.load(f)
-            print("Modèle classique chargé avec succès")
-            
-            # Vérifier si le modèle a les méthodes nécessaires
-            has_predict = hasattr(model, 'predict') and callable(getattr(model, 'predict'))
-            has_predict_proba = hasattr(model, 'predict_proba') and callable(getattr(model, 'predict_proba'))
-            
-            print(f"Le modèle a une méthode 'predict': {has_predict}")
-            print(f"Le modèle a une méthode 'predict_proba': {has_predict_proba}")
-            
-            model_type = "classical"
-            
-        elif best_model_type == 'deeplearning':
-            if not tf_available:
-                raise ImportError("TensorFlow n'est pas disponible, impossible de charger un modèle deep learning")
-            model = tf.keras.models.load_model(best_model_path)
-            
-            if tokenizer_path is None:
-                raise ValueError("Le chemin du tokenizer est requis pour un modèle deep learning")
-            
-            if not os.path.exists(tokenizer_path):
-                raise FileNotFoundError(f"Le fichier tokenizer n'existe pas: {tokenizer_path}")
-                
-            with open(tokenizer_path, 'rb') as f:
-                tokenizer = pickle.load(f)
-            print("Modèle deep learning et tokenizer chargés avec succès")
-            
-            model_type = "deeplearning"
-            
-        elif best_model_type == 'transformer':
-            if not transformers_available:
-                raise ImportError("La bibliothèque transformers n'est pas disponible")
-                
-            if 'distilbert' in best_model_path.lower():
-                model = TFDistilBertForSequenceClassification.from_pretrained(best_model_path)
-                tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
-                print("Modèle DistilBERT et tokenizer chargés avec succès")
-            else:
-                model = TFBertForSequenceClassification.from_pretrained(best_model_path)
-                tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-                print("Modèle BERT et tokenizer chargés avec succès")
-                
-            model_type = "transformer"
-                
-        else:
-            raise ValueError(f"Type de modèle non reconnu: {best_model_type}")
-        
-        print("Modèle chargé avec succès")
-    
-    except Exception as e:
-        print(f"ERREUR lors du chargement du modèle: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        print("Tentative de chargement du modèle de régression logistique par défaut...")
-        
-        # Configuration de secours
-        current_config = {
-            "best_model": os.path.join(BASE_DIR, 'models', 'classical', 'regression_logistique.pkl'),
-            "best_model_type": "classical",
-            "tokenizer": None
-        }
-        
-        try:
-            with open(current_config["best_model"], 'rb') as f:
-                model = pickle.load(f)
-            tokenizer = None
-            model_type = "classical"
-            print("Modèle de secours chargé avec succès")
-        except Exception as fallback_error:
-            print(f"ERREUR CRITIQUE: Impossible de charger le modèle de secours: {fallback_error}")
-            model = None
-            tokenizer = None
-            model_type = "classical"
-    
-    # Validons que le modèle est correctement chargé avant de démarrer le serveur
-    if model is None:
-        print("ERREUR FATALE: Aucun modèle n'a été chargé. Impossible de démarrer l'API.")
-        sys.exit(1)
-        
-    print(f"Configuration utilisée: {current_config}")
-    print(f"Type de modèle: {model_type}")
-    print("Démarrage du serveur Flask...")
-    app.run(host='0.0.0.0', port=5000, debug=True)
