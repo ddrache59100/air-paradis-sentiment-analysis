@@ -1,0 +1,6 @@
+
+{
+    "best_model": "models/classical/regression_logistique.pkl",
+    "best_model_type": "classical",
+    "tokenizer": null
+}
