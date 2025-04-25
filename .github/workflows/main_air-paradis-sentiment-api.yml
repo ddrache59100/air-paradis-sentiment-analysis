@@ -20,25 +20,17 @@ jobs:
       
       - name: Prepare deployment package
         run: |
-          # Créer un fichier requirements.txt
+          # Créer un fichier requirements.txt si ce n'est pas déjà fait
           cp requirements_classical.txt requirements.txt
           
-          # Créer un fichier wsgi.py simple
-          echo "from api import app" > wsgi.py
-          echo "" >> wsgi.py
-          echo "if __name__ == \"__main__\":" >> wsgi.py
-          echo "    app.run()" >> wsgi.py
-          
-          # S'assurer que le fichier startup.sh existe
-          echo "#!/bin/bash" > startup.sh
-          echo "cd /home/site/wwwroot" >> startup.sh
-          echo "gunicorn --bind=0.0.0.0 --timeout 600 api:app" >> startup.sh
+          # S'assurer que les scripts sont exécutables
           chmod +x startup.sh
       
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v2
         with:
-          app-name: 'air-paradis-sentiment-api2'  # Utilisez le nouveau nom
+          app-name: 'air-paradis-sentiment-api'
           slot-name: 'Production'
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}  # Vous devrez mettre à jour ce secret
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
           package: .
+          clean: true  # Pour s'assurer que les anciens fichiers sont supprimés
