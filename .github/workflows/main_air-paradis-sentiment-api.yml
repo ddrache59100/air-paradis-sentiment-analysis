@@ -33,4 +33,3 @@ jobs:
           slot-name: 'Production'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
           package: .
-          clean: true  # Pour s'assurer que les anciens fichiers sont supprimés
