@@ -7,6 +7,10 @@ import pickle
 import numpy as np
 from flask import Flask, request, jsonify
 
+model = None
+tokenizer = None
+model_type = None
+current_config = None
 
 # Importations conditionnelles selon le type de modele
 try:
@@ -362,6 +366,8 @@ def predict_sentiment():
 # --- Endpoint de statut ---
 @app.route('/status', methods=['GET'])
 def status():
+    global model, model_type, current_config  # Référencez explicitement les variables globales
+    
     return jsonify({
         "status": "API operationnelle",
         "model_loaded": model is not None,
