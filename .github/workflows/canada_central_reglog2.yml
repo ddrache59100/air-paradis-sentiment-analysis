@@ -30,11 +30,25 @@ jobs:
       - name: Install dependencies for tests
         run: |
           pip install -r requirements.txt
-      
+          pip install pytest pytest-html
+
       - name: Run unit tests
         run: |
+          echo "🧪 Running unit tests..."
           python -m unittest test_unit.py
       
+      - name: Run pytest with HTML reporting
+        run: |
+          echo "🧪 Running pytest tests..."
+          python -m pytest test_api_pytest.py -v --html=test-report.html --self-contained-html
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()  # This ensures the report is uploaded even if tests fail
+        with:
+          name: test-results
+          path: test-report.html
+
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v2
         with:
