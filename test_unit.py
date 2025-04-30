@@ -1,24 +1,40 @@
 import unittest
 import json
-from api import app, clean_text
+from api import app, clean_text, predict_with_model
 
-class TestAPI(unittest.TestCase):
+class TestAPIFunctions(unittest.TestCase):
     def setUp(self):
         self.app = app.test_client()
         self.app.testing = True
+
+    def test_clean_text(self):
+        # Test de nettoyage de texte basique
+        text = "Hello @user! Check out https://example.com #example"
+        expected = "hello user check out example"
+        self.assertEqual(clean_text(text), expected)
         
-    def test_status_endpoint(self):
-        response = self.app.get('/status')
-        self.assertEqual(response.status_code, 200)
+        # Test avec texte vide
+        self.assertEqual(clean_text(""), "")
+        
+        # Test avec input non-texte
+        self.assertEqual(clean_text(None), "")
+        self.assertEqual(clean_text(123), "")
+
+    def test_predict_endpoint(self):
+        # Test avec un tweet positif
+        response = self.app.post('/predict', 
+                               data=json.dumps({'text': 'I love this airline!'}),
+                               content_type='application/json')
         data = json.loads(response.data)
-        self.assertIn('status', data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('label', data)
+        self.assertIn('probabilities', data)
         
-    def test_clean_text_function(self):
-        text = "Hello @user #test http://example.com"
-        cleaned = clean_text(text)
-        self.assertEqual(cleaned, "hello test")
+        # Test avec requête mal formée
+        response = self.app.post('/predict', 
+                               data=json.dumps({'wrong_field': 'text'}),
+                               content_type='application/json')
+        self.assertEqual(response.status_code, 400)
 
 if __name__ == '__main__':
     unittest.main()
-
-    
