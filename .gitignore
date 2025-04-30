@@ -2,9 +2,11 @@
 models/*
 models/**/*
 
-# Mais garder regression_logistique.pkl
-!models/classical/
-!models/classical/regression_logistique.pkl
+# Mais garder les fichiers du modèle DistilBERT
+!models/bert/
+!models/bert/distilbert_base/
+!models/bert/distilbert_base/tf_model.h5
+!models/bert/distilbert_base/config.json
 
 # Environnements virtuels et fichiers Python temporaires
 venv*/
