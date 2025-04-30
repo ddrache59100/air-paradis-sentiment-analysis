@@ -22,6 +22,9 @@ jobs:
         run: |
           cp requirements_classical.txt requirements.txt
           chmod +x startup.sh
+          chmod +x build.sh
+          echo "[config]" > .deployment
+          echo "SCM_DO_BUILD_DURING_DEPLOYMENT=true" >> .deployment
           cp model_config_reglog.json model_config.json
       
       - name: Deploy to Azure Web App
