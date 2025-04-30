@@ -1,0 +1,33 @@
+name: Deploy to Azure Web App - RegLog2 Canada Central
+
+on:
+  push:
+    branches:
+      - reg_log
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Prepare deployment package
+        run: |
+          cp requirements_classical.txt requirements.txt
+          chmod +x startup.sh
+          cp model_config_reglog.json model_config.json
+      
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: 'air-paradis-sentiment-api-reglog2'
+          slot-name: 'Production'
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_REGLOG2 }}
+          package: .
