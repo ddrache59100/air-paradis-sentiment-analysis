@@ -32,9 +32,10 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_AE496B0C8B1C4FBF9467C2A9A69CAA40 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_307DB58F51644A8897077E2C525BFAE7 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_7517AB2BDD0A4ABBB44BE715714E19AD }}
+          app-name: 'air-paradis-sentiment-api-reglog'
+          slot-name: 'Production'
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_REGLOG }}  # Vous devrez créer ce secret
+          package: .
       
       - name: Deploy to Azure Web App
         id: deploy-to-webapp
