@@ -1,4 +1,4 @@
-name: Build and deploy Python app to Azure - Reg Log
+name: Build and deploy Python app to Azure - RegLog
 
 on:
   push:
@@ -26,21 +26,13 @@ jobs:
           # S'assurer que les scripts sont exécutables
           chmod +x startup.sh
           
-          # Renommer le fichier de configuration par défaut
+          # Renommer le fichier de configuration pour utiliser le modèle de régression logistique
           cp model_config_reglog.json model_config.json
       
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          app-name: 'air-paradis-sentiment-api-reglog'
-          slot-name: 'Production'
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_REGLOG }}  # Vous devrez créer ce secret
-          package: .
-      
       - name: Deploy to Azure Web App
-        id: deploy-to-webapp
         uses: azure/webapps-deploy@v2
         with:
           app-name: 'air-paradis-sentiment-api-reglog'
           slot-name: 'Production'
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_REGLOG }}
           package: .
