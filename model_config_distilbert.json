@@ -1,5 +1,0 @@
-{
-    "best_model": "models/bert/distilbert_base",
-    "best_model_type": "transformer",
-    "tokenizer": null
-}

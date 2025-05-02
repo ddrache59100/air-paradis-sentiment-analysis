@@ -1,11 +1,19 @@
 # api.py avec lazy loading du modèle
 
 import os
+import datetime
 import re
 import json
 import pickle
 import numpy as np
 from flask import Flask, request, jsonify
+from flask_cors import CORS
+from opencensus.ext.azure.log_exporter import AzureLogHandler
+import logging
+
+# Configuration du logger pour Application Insights
+# Ajoutez ceci après l'initialisation de l'app Flask
+logger = logging.getLogger(__name__)
 
 # Importations conditionnelles selon le type de modele
 try:
@@ -21,8 +29,25 @@ try:
 except ImportError:
     transformers_available = False
 
+# Vérifiez si la clé d'instrumentation est définie dans les variables d'environnement
+app_insights_key = os.environ.get('APPLICATIONINSIGHTS_CONNECTION_STRING')
+if app_insights_key:
+    logger.addHandler(
+        AzureLogHandler(
+            connection_string=app_insights_key
+        )
+    )
+    logger.setLevel(logging.INFO)
+else:
+    # Utiliser un logger standard si App Insights n'est pas configuré
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+
 # --- Initialisation de l'application Flask ---
 app = Flask(__name__)
+CORS(app)  # Activer CORS pour toutes les routes
 
 # Configuration pour permettre de specifier un fichier de configuration alternatif
 app.config.from_mapping(
@@ -269,6 +294,12 @@ def predict_with_model(text, model_type, model, tokenizer=None):
     
     return sentiment, int(prediction_class), probabilities, cleaned_text
 
+@app.before_request
+def log_request_info():
+    print(f"Requête reçue: {request.method} {request.path}")
+    if request.is_json:
+        print(f"Données JSON: {request.json}")
+
 # --- Endpoint pour changer la configuration ---
 @app.route('/config', methods=['POST'])
 def change_config():
@@ -326,13 +357,13 @@ def get_current_config():
 @app.route('/predict', methods=['POST'])
 def predict_sentiment():
     if not request.is_json:
-        return jsonify({"error": "La requete doit etre au format JSON"}), 400
+        return jsonify({"error": "La requête doit être au format JSON"}), 400
 
     data = request.get_json()
     text = data.get('text', None)
 
     if text is None or not isinstance(text, str) or not text.strip():
-        return jsonify({"error": "Le champ 'text' est manquant, vide ou n'est pas une chaine de caracteres"}), 400
+        return jsonify({"error": "Le champ 'text' est manquant, vide ou n'est pas une chaîne de caractères"}), 400
 
     try:
         # Charger le modèle si nécessaire
@@ -341,8 +372,8 @@ def predict_sentiment():
         # Vérifier si le modèle est chargé
         if model is None:
             return jsonify({
-                "error": "Aucun modele n'est charge. Impossible de faire une prediction.",
-                "suggestion": "Verifiez les logs du serveur et assurez-vous que le modele est correctement configure."
+                "error": "Aucun modèle n'est chargé. Impossible de faire une prédiction.",
+                "suggestion": "Vérifiez les logs du serveur et assurez-vous que le modèle est correctement configuré."
             }), 500
             
         # Prediction
@@ -350,22 +381,24 @@ def predict_sentiment():
             text, model_type, model, tokenizer
         )
         
-        # Resultat
+        # Résultat enrichi pour le front-end
         return jsonify({
             "input_text": text,
             "cleaned_text": cleaned_text,
             "label": sentiment,
             "prediction": prediction,
+            "confidence": max(probabilities.values()),  # Ajouter le niveau de confiance
             "probabilities": probabilities,
-            "model_type": model_type
+            "model_type": model_type,
+            "timestamp": datetime.datetime.now().isoformat()  # Ajouter un timestamp
         })
     
     except Exception as e:
-        print(f"Erreur lors de la prediction: {e}")
+        print(f"Erreur lors de la prédiction: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({"error": "Une erreur interne est survenue lors de la prediction.", 
-                       "details": str(e)}), 500
+        return jsonify({"error": "Une erreur interne est survenue lors de la prédiction.", 
+                      "details": str(e)}), 500
 
 # --- Endpoint de statut ---
 @app.route('/status', methods=['GET'])
@@ -433,4 +466,49 @@ def welcome():
             "path": app.config.get('CUSTOM_CONFIG_PATH') or DEFAULT_CONFIG_PATH,
             "is_custom": app.config.get('CUSTOM_CONFIG_PATH') is not None
         }
+    })
+
+@app.route('/ping', methods=['GET'])
+def ping():
+    """
+    Simple endpoint pour vérifier si l'API est accessible.
+    """
+    return jsonify({"status": "ok", "message": "API is running"}), 200
+
+
+@app.route('/feedback', methods=['POST'])
+def submit_feedback():
+    """
+    Endpoint pour recevoir le feedback de l'utilisateur sur une prédiction.
+    """
+    if not request.is_json:
+        return jsonify({"error": "La requête doit être au format JSON"}), 400
+
+    data = request.get_json()
+    text = data.get('text')
+    predicted_sentiment = data.get('predicted_sentiment')
+    actual_sentiment = data.get('actual_sentiment')
+    timestamp = data.get('timestamp', datetime.datetime.now().isoformat())
+
+    if not all([text, predicted_sentiment, actual_sentiment]):
+        return jsonify({"error": "Les champs 'text', 'predicted_sentiment' et 'actual_sentiment' sont requis"}), 400
+
+    # Enregistrement du feedback dans Application Insights
+    is_correct = predicted_sentiment == actual_sentiment
+    feedback_data = {
+        'event': 'prediction_feedback',
+        'text': text,
+        'predicted_sentiment': predicted_sentiment,
+        'actual_sentiment': actual_sentiment,
+        'is_correct': is_correct,
+        'timestamp': timestamp
+    }
+    
+    # Envoyer les données à Application Insights
+    logger.info('prediction_feedback', extra={'custom_dimensions': feedback_data})
+       
+    return jsonify({
+        "status": "success", 
+        "message": "Feedback reçu avec succès", 
+        "is_correct": is_correct
     })

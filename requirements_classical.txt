@@ -1,10 +1,18 @@
+# Core API dependencies
 Flask==2.0.1
-Werkzeug==2.0.3
-gunicorn==20.1.0
-scikit-learn==1.3.2
+Werkzeug==2.0.3 # Dependency of Flask
+itsdangerous==2.0.1 # Dependency of Flask
+Jinja2==3.0.3 # Dependency of Flask
+click==8.0.4 # Dependency of Flask
+gunicorn==20.1.0 # WSGI Server for deployment
+
+# CORS
+flask-cors
+
+# Logging & Monitoring
+opencensus-ext-azure
+
+# Numerical operations & Model loading for classical models
 numpy==1.23.5
-pandas==1.5.3
+scikit-learn==1.3.2
 joblib==1.1.1
-itsdangerous==2.0.1
-Jinja2==3.0.3
-click==8.0.4
