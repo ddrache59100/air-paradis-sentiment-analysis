@@ -1,7 +1,7 @@
 # Air Paradis - Analyse de Sentiments pour l'Anticipation des Bad Buzz
 
 ![Badge GitHub Actions](https://github.com/votre-username/air-paradis-sentiment-analysis/actions/workflows/canada_central_reglog2.yml/badge.svg)
-![License](https://img.shields.io/badge/License-MIT-blue.svg)
+
 
 ## Description du projet
 
