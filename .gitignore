@@ -60,3 +60,4 @@ htmlcov/
 *~
 .old/
 *.save
+.ipynb_checkpoints/
