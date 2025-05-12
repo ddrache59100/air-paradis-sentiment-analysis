@@ -29,6 +29,8 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+.ipynb_checkpoints/
+
 
 # Fichiers système
 .DS_Store

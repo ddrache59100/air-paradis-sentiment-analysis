@@ -1,0 +1,58 @@
+name: Deploy to Azure Web App - Distilbert2 Canada Central
+
+on:
+  push:
+    branches:
+      - reg_log
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Prepare deployment package
+        run: |
+          cp requirements_distilbert.txt requirements.txt
+          chmod +x startup.sh
+          chmod +x build.sh
+          echo "[config]" > .deployment
+          echo "SCM_DO_BUILD_DURING_DEPLOYMENT=true" >> .deployment
+          cp model_config_distilbert.json model_config.json
+      
+      - name: Install dependencies for tests
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-html
+
+      - name: Run unit tests
+        run: |
+          echo "🧪 Running unit tests..."
+          python -m unittest test_unit.py
+      
+      - name: Run pytest with HTML reporting
+        run: |
+          echo "🧪 Running pytest tests..."
+          python -m pytest test_api_pytest.py -v --html=test-report.html --self-contained-html
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()  # This ensures the report is uploaded even if tests fail
+        with:
+          name: test-results
+          path: test-report.html
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: 'air-paradis-sentiment-api-distilbert2'
+          slot-name: 'Production'
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_DISTILBERT2 }}
+          package: .
