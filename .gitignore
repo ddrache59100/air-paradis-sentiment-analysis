@@ -2,9 +2,13 @@
 models/*
 models/**/*
 
-# Garder les fichiers des modèles classiques
-!models/classical/
-!models/classical/regression_logistique.pkl
+## Garder les fichiers des modèles classiques
+#!models/classical/
+#!models/classical/regression_logistique.pkl
+
+# Garder les fichiers du modèle de cnn-embed
+!models/deeplearning/cnn_(embeddings_entrainables).keras
+!models/deeplearning/tokenizer.pkl
 
 # Environnements virtuels et fichiers Python temporaires
 venv*/
