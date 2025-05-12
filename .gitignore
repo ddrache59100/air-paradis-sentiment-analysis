@@ -31,6 +31,7 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+.ipynb_checkpoints/
 
 # Fichiers système
 .DS_Store
@@ -60,4 +61,4 @@ htmlcov/
 *~
 .old/
 *.save
-.ipynb_checkpoints/
+
