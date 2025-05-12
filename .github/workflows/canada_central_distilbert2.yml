@@ -11,7 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true  # Ajouter cette ligne pour activer Git LFS
       
       - name: Set up Python
         uses: actions/setup-python@v5
