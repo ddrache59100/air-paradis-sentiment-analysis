@@ -8,7 +8,7 @@ import pickle
 import numpy as np
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from opencensus.ext.azure.log_exporter import AzureLogHandler
+from opencensus.ext.azure.log_exporter import AzureLogHandler, AzureEventHandler
 import logging
 
 # Configuration du logger pour Application Insights
@@ -32,18 +32,23 @@ except ImportError:
 # Vérifiez si la clé d'instrumentation est définie dans les variables d'environnement
 app_insights_key = os.environ.get('APPLICATIONINSIGHTS_CONNECTION_STRING')
 if app_insights_key:
-    logger.addHandler(
-        AzureLogHandler(
-            connection_string=app_insights_key
-        )
-    )
+    # Ajouter un handler pour les événements
+    event_handler = AzureEventHandler(connection_string=app_insights_key)
+    logger.addHandler(event_handler)
+    
+    # Ajouter un handler pour les logs
+    log_handler = AzureLogHandler(connection_string=app_insights_key)
+    logger.addHandler(log_handler)
+    
     logger.setLevel(logging.INFO)
+    print(f"Application Insights configuré avec la clé: {app_insights_key}")
 else:
     # Utiliser un logger standard si App Insights n'est pas configuré
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
+    print("Application Insights non configuré, utilisation du logger standard.")
 
 # --- Initialisation de l'application Flask ---
 app = Flask(__name__)
@@ -495,20 +500,31 @@ def submit_feedback():
 
     # Enregistrement du feedback dans Application Insights
     is_correct = predicted_sentiment == actual_sentiment
-    feedback_data = {
-        'event': 'prediction_feedback',
-        'text': text,
-        'predicted_sentiment': predicted_sentiment,
-        'actual_sentiment': actual_sentiment,
-        'is_correct': is_correct,
-        'timestamp': timestamp
-    }
     
-    # Envoyer les données à Application Insights
-    logger.info('prediction_feedback', extra={'custom_dimensions': feedback_data})
-       
-    return jsonify({
-        "status": "success", 
-        "message": "Feedback reçu avec succès", 
-        "is_correct": is_correct
-    })
+    try:
+        # Version améliorée: utilisation directe d'AzureEventHandler
+        properties = {
+            'text': text,
+            'predicted_sentiment': predicted_sentiment,
+            'actual_sentiment': actual_sentiment,
+            'is_correct': is_correct,
+            'timestamp': timestamp
+        }
+        
+        # Envoyer l'événement
+        logger.info("prediction_feedback", extra={"custom_dimensions": properties})
+        print(f"Event envoyé à Application Insights: prediction_feedback avec {properties}")
+        
+        return jsonify({
+            "status": "success", 
+            "message": "Feedback reçu avec succès", 
+            "is_correct": is_correct
+        })
+    except Exception as e:
+        print(f"Erreur lors de l'envoi du feedback à Application Insights: {e}")
+        return jsonify({
+            "status": "success", 
+            "message": "Feedback reçu avec succès, mais erreur lors du logging", 
+            "is_correct": is_correct,
+            "error": str(e)
+        })
