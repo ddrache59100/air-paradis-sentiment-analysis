@@ -15,7 +15,7 @@ La solution comprend:
 ## Modèle utilisé dans cette API
 Cette API utilise spécifiquement le modèle CNN avec embeddings entraînables:
 - Réseau de neurones convolutionnels avec une couche d'embeddings personnalisée
-- F1 Score: X.XX sur l'ensemble de test
+- F1 Score: 0.827 sur l'ensemble de test
 - Excellente performance sur les tweets courts et moyens
 - Équilibre optimal entre précision et efficacité computationnelle
 
